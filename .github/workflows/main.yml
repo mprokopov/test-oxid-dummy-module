@@ -1,0 +1,136 @@
+name: dummy oxid module pipeline
+
+on: [push]
+
+jobs:
+  install:
+    runs-on: ubuntu-latest
+    container:
+      image: composer:1.10.17
+    env:
+      MODULE_NAME: oxid-professional-services/dummy
+    steps:
+    - uses: actions/checkout@v1
+
+    - name: install
+      run: composer create-project mprokopov/test-oxid-docker /__w/oxid --no-interaction -s dev --repository="{\"url\":\"https://github.com/mprokopov/test-oxid-docker.git\", \"type\":\"vcs\"}" --remove-vcs
+
+    - name: move artifacts to projects folder
+      run: |
+        mkdir -p /__w/oxid/project-modules/module-under-test && cp -r * /__w/oxid/project-modules/module-under-test
+
+    - name: add project module folder
+      run:
+        composer config repositories.build path /__w/oxid/project-modules/\*
+      working-directory: /__w/oxid
+
+    - name: require module
+      run: cd /__w/oxid && composer require --no-interaction $MODULE_NAME
+      working-directory: /__w/oxid
+
+    - name: zip temp artifact
+      run: |
+        tar czf oxid.tar.gz --directory /__w oxid 
+
+    - name: Upload oxid-with-deps
+      uses: actions/upload-artifact@v2
+      with:
+        name: oxid-with-deps
+        path: oxid.tar.gz
+
+  codestyle_checks:
+    runs-on: ubuntu-latest
+    needs: install
+    container:
+      image: oxidesales/oxideshop-docker-php:7.4
+    steps:
+    - uses: actions/checkout@v1
+    - name: Download a single artifact
+      uses: actions/download-artifact@v2
+      with:
+        name: oxid-with-deps
+    - name: extract temp artifact
+      run: |
+        tar xzf oxid.tar.gz && mv oxid /__w
+    - name: prepare autoload
+      run: |
+        bin/symlinkProjectModules.sh
+        bin/createModuleAutoload.sh
+        cp config.inc.php-dist source/config.inc.php
+      working-directory: /__w/oxid
+
+    - name: run code checks
+      run: composer ci:codecheck
+      working-directory: /__w/oxid
+
+  unit_tests:
+    runs-on: ubuntu-latest
+    needs: install
+    container:
+      image: oxidesales/oxideshop-docker-php:7.4
+    steps:
+    - uses: actions/checkout@v1
+    - name: Download a single artifact
+      uses: actions/download-artifact@v2
+      with:
+        name: oxid-with-deps
+    - name: extract temp artifact
+      run: |
+        tar xzf oxid.tar.gz && mv oxid /__w
+    - name: prepare autoload
+      run: |
+        bin/symlinkProjectModules.sh
+        bin/createModuleAutoload.sh
+        cp config.inc.php-dist source/config.inc.php
+      working-directory: /__w/oxid
+
+    - name: run unit tests
+      run: vendor/bin/phpunit --testsuite unit-tests
+      working-directory: /__w/oxid
+
+  integration_tests:
+    runs-on: ubuntu-latest
+    needs: install
+    container:
+      image: oxidesales/oxideshop-docker-php:7.4
+    env:
+      DB_NAME: oxid
+      DB_HOST: db
+      DB_USER: root
+      DB_PASS: root
+    services:
+      db:
+        image: mysql:5.7
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: oxid
+        ports:
+          - 3306
+        options: --health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=3
+    steps:
+    - uses: actions/checkout@v1
+    - name: Download a single artifact
+      uses: actions/download-artifact@v2
+      with:
+        name: oxid-with-deps
+
+    - name: extract temp artifact
+      run: |
+        tar xzf oxid.tar.gz && mv oxid /__w
+
+    - name: prepare autoload
+      run: |
+        bin/symlinkProjectModules.sh
+        bin/createModuleAutoload.sh
+        cp config.inc.php-dist source/config.inc.php
+      working-directory: /__w/oxid
+
+    - name: prepare db dump
+      run: |
+        composer ci:prep:db
+        composer ci:prep:integration
+      working-directory: /__w/oxid
+
+    - name: run integration tests
+      run: vendor/bin/phpunit --prepend source/bootstrap.php --testsuite integration-tests
+      working-directory: /__w/oxid
