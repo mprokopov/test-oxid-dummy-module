@@ -1,0 +1,20 @@
+{
+  "name": "oxid-professional-services/dummy",
+  "description": "Project dummy module for testing",
+  "keywords": ["oxid", "modules", "eShop", "import", "export"],
+  "license": "GPL-3.0",
+  "version": "0.0.1",
+  "require": {
+    "php": ">=7.0"
+  },
+  "extra": {
+    "oxideshop": {
+      "target-directory": "oxps/dummy"
+    }
+  },
+  "autoload": {
+    "psr-4": {
+      "OxidProfessionalServices\\Dummy\\": "./"
+    }
+  }
+}
