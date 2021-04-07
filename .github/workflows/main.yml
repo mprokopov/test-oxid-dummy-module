@@ -28,9 +28,12 @@ jobs:
       run: cd /__w/oxid && composer require --no-interaction $MODULE_NAME
       working-directory: /__w/oxid
 
+    - name: move config to source folder
+      run: cp config.inc.php-dist source/config.inc.php
+      working-directory: /__w/oxid
+
     - name: zip temp artifact
-      run: |
-        tar czf oxid.tar.gz --directory /__w oxid 
+      run: tar czf oxid.tar.gz --directory /__w oxid 
 
     - name: Upload oxid-with-deps
       uses: actions/upload-artifact@v2
@@ -56,7 +59,6 @@ jobs:
       run: |
         bin/symlinkProjectModules.sh
         bin/createModuleAutoload.sh
-        cp config.inc.php-dist source/config.inc.php
       working-directory: /__w/oxid
 
     - name: run code checks
@@ -81,7 +83,6 @@ jobs:
       run: |
         bin/symlinkProjectModules.sh
         bin/createModuleAutoload.sh
-        cp config.inc.php-dist source/config.inc.php
       working-directory: /__w/oxid
 
     - name: run unit tests
@@ -122,7 +123,6 @@ jobs:
       run: |
         bin/symlinkProjectModules.sh
         bin/createModuleAutoload.sh
-        cp config.inc.php-dist source/config.inc.php
       working-directory: /__w/oxid
 
     - name: prepare db dump
